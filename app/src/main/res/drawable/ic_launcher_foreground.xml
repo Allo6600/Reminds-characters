@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ランチャーアイコン：マスコット「リマ」 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 体 -->
+    <path
+        android:fillColor="#FFC94D"
+        android:pathData="M54,54m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0"/>
+    <!-- 葉っぱ -->
+    <path
+        android:fillColor="#7CB342"
+        android:pathData="M54,28 C50,20 44,18 40,20 C44,24 48,26 54,28 Z"/>
+    <!-- 目 -->
+    <path
+        android:fillColor="#4E342E"
+        android:pathData="M44,50m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path
+        android:fillColor="#4E342E"
+        android:pathData="M64,50m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <!-- ほっぺ -->
+    <path
+        android:fillColor="#99FF8A80"
+        android:pathData="M40,58m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0"/>
+    <path
+        android:fillColor="#99FF8A80"
+        android:pathData="M68,58m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0"/>
+    <!-- くち -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#4E342E"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M50,58 Q54,62 58,58"/>
+</vector>

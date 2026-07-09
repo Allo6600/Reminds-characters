@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">リマキャラ</string>
+    <string name="character_name">リマ</string>
+
+    <string name="bubble_empty">やることある？タップしてメモしてね！</string>
+    <string name="bubble_tasks">今日のタスクはあと%d個！がんばろう！</string>
+    <string name="today_goal">🎯 その日のうちに終わらせよう。</string>
+
+    <string name="memo_prompt">なにをリマインドする？</string>
+    <string name="memo_hint">例：歯医者を予約 / 15時に資料送る</string>
+    <string name="remind_me">リマインドしてもらう</string>
+    <string name="scheduled_at">%s にリマインドするね！</string>
+
+    <string name="edit_time_title">リマインド時刻を変更</string>
+    <string name="deadline_label">〆 %s まで</string>
+    <string name="delete">削除</string>
+    <string name="ok">OK</string>
+    <string name="cancel">キャンセル</string>
+
+    <string name="channel_name">リマのリマインド</string>
+    <string name="channel_description">キャラクターがタスクの時間を教えてくれます</string>
+</resources>

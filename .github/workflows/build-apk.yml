@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+    branches:
+      - claude/reminder-ai-google-inn69p
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: ユニットテスト
+        run: ./gradlew testDebugUnitTest --console=plain
+
+      - name: デバッグAPKをビルド
+        run: ./gradlew assembleDebug --console=plain
+
+      - name: APKをアーティファクトとして保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: rimachara-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: リリースページにAPKを公開（スマホから直接DL用）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: リマキャラ デバッグ版APK（最新）
+          body: |
+            スマホのブラウザで下の `app-debug.apk` をタップしてダウンロード →
+            開いてインストール（「提供元不明のアプリ」の許可が必要です）。
+          prerelease: true
+          files: app/build/outputs/apk/debug/app-debug.apk

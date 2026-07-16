@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".RemindsApplication"
@@ -27,6 +30,15 @@
         <receiver
             android:name=".notify.ReminderReceiver"
             android:exported="false" />
+
+        <service
+            android:name=".overlay.MascotOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="ホーム画面のマスコットがタスクのリマインドを吹き出しで表示" />
+        </service>
 
         <receiver
             android:name=".widget.CharacterWidgetProvider"

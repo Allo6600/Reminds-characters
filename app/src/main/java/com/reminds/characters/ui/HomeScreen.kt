@@ -34,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -47,15 +48,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.reminds.characters.R
 import com.reminds.characters.data.Task
+import com.reminds.characters.overlay.MascotOverlayService
+import com.reminds.characters.overlay.OverlayPrefs
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -98,7 +105,47 @@ fun HomeScreen(viewModel: TaskViewModel) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+
+            // ホーム画面（他アプリの上）にキャラを常駐させるスイッチ
+            val context = LocalContext.current
+            var overlayOn by remember { mutableStateOf(OverlayPrefs.isEnabled(context)) }
+            val permissionHint = stringResource(R.string.overlay_permission_hint)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.overlay_toggle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = overlayOn,
+                    onCheckedChange = { on ->
+                        if (on) {
+                            if (Settings.canDrawOverlays(context)) {
+                                OverlayPrefs.setEnabled(context, true)
+                                overlayOn = true
+                                MascotOverlayService.startIfEnabled(context)
+                            } else {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}"),
+                                    ),
+                                )
+                                scope.launch { snackbarHostState.showSnackbar(permissionHint) }
+                            }
+                        } else {
+                            OverlayPrefs.setEnabled(context, false)
+                            overlayOn = false
+                            context.stopService(Intent(context, MascotOverlayService::class.java))
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(4.dp))
 
             LazyColumn(
                 modifier = Modifier

@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.reminds.characters.overlay.MascotOverlayService
 import com.reminds.characters.ui.HomeScreen
 import com.reminds.characters.ui.TaskViewModel
 import com.reminds.characters.ui.theme.RemindsTheme
@@ -25,6 +26,9 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+
+        // キャラ常駐がONなら復帰させる（権限を許可して戻ってきた直後にも効く）
+        MascotOverlayService.startIfEnabled(this)
 
         setContent {
             RemindsTheme {

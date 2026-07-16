@@ -18,6 +18,13 @@
     <string name="ok">OK</string>
     <string name="cancel">キャンセル</string>
 
+    <string name="overlay_toggle">ホーム画面にキャラを出す</string>
+    <string name="overlay_permission_hint">「他のアプリの上に表示」を許可してから、もう一度オンにしてね</string>
+    <string name="overlay_idle">やることある？</string>
+    <string name="overlay_channel_name">キャラの常駐表示</string>
+    <string name="overlay_notification_title">リマがホームでお留守番中</string>
+    <string name="overlay_stop">しまう</string>
+
     <string name="widget_description">キャラがホーム画面で次のタスクを教えてくれます</string>
     <string name="widget_empty">やることある？タップしてメモしてね！</string>
     <string name="widget_next">「%1$s」%2$s にお知らせするね！</string>

@@ -24,6 +24,8 @@
     <string name="overlay_channel_name">キャラの常駐表示</string>
     <string name="overlay_notification_title">リマがホームでお留守番中</string>
     <string name="overlay_stop">しまう</string>
+    <string name="overlay_home_only_hint">💡 ホーム画面だけに表示したい場合は「使用状況へのアクセス」を許可 →</string>
+    <string name="overlay_home_only_button">設定を開く</string>
 
     <string name="widget_description">キャラがホーム画面で次のタスクを教えてくれます</string>
     <string name="widget_empty">やることある？タップしてメモしてね！</string>

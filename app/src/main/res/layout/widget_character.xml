@@ -16,7 +16,9 @@
         android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
         android:gravity="center"
-        android:textSize="14sp"
+        android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="11sp"
+        android:autoSizeMaxTextSize="18sp"
         android:textColor="#5D4037"
         android:text="@string/widget_empty" />
 

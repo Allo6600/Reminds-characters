@@ -145,6 +145,26 @@ fun HomeScreen(viewModel: TaskViewModel) {
                     },
                 )
             }
+            if (overlayOn) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.overlay_home_only_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        }
+                    }) {
+                        Text(stringResource(R.string.overlay_home_only_button))
+                    }
+                }
+            }
             Spacer(Modifier.height(4.dp))
 
             LazyColumn(

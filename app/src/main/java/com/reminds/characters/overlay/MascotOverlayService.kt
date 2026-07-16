@@ -7,10 +7,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -18,6 +21,7 @@ import android.os.IBinder
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
@@ -94,6 +98,7 @@ class MascotOverlayService : Service() {
         observeBubble()
         startWandering()
         startBobbing()
+        startHomeOnlyWatcher()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -146,11 +151,13 @@ class MascotOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
+            // 下端アンカー：吹き出しが伸びても上方向に広がり、キャラが下に見切れない
+            gravity = Gravity.BOTTOM or Gravity.START
             x = dp(40)
-            y = resources.displayMetrics.heightPixels - dp(340)
+            y = dp(90) // 画面下端からの距離
         }
         windowManager.addView(root, params)
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> clampIntoScreen() }
 
         // ドラッグで移動、動かさずに離したらタップ＝アプリを開く
         val slop = ViewConfiguration.get(this).scaledTouchSlop
@@ -172,8 +179,9 @@ class MascotOverlayService : Service() {
                     val dy = e.rawY - downY
                     if (abs(dx) > slop || abs(dy) > slop) dragging = true
                     if (dragging) {
+                        // yは下端からの距離なので、指を下に動かしたら減らす
                         params.x = (startPX + dx).toInt().coerceIn(0, maxX())
-                        params.y = (startPY + dy).toInt().coerceIn(0, maxY())
+                        params.y = (startPY - dy).toInt().coerceIn(0, maxY())
                         runCatching { windowManager.updateViewLayout(root, params) }
                     }
                     true
@@ -251,6 +259,51 @@ class MascotOverlayService : Service() {
     private fun rootWidth(): Int = if (root.width > 0) root.width else dp(200)
 
     private fun rootHeight(): Int = if (root.height > 0) root.height else dp(160)
+
+    // ---- ホーム画面のみ表示 ----
+
+    /**
+     * 他のアプリを使っている間はキャラを隠す。
+     * 「使用状況へのアクセス」が未許可の間はフォアグラウンドが取れないため常時表示のまま。
+     */
+    private fun startHomeOnlyWatcher() {
+        val usageManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val homePackages = launcherPackages()
+        scope.launch {
+            while (isActive) {
+                if (screenOn) {
+                    val foreground = foregroundPackage(usageManager)
+                    val onHome = foreground == null ||
+                        foreground in homePackages ||
+                        foreground == packageName
+                    val target = if (onHome) View.VISIBLE else View.GONE
+                    if (root.visibility != target) root.visibility = target
+                }
+                delay(2_000)
+            }
+        }
+    }
+
+    private fun foregroundPackage(usageManager: UsageStatsManager): String? {
+        val now = System.currentTimeMillis()
+        val events = usageManager.queryEvents(now - 60_000, now)
+        var latest: String? = null
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                latest = event.packageName
+            }
+        }
+        return latest
+    }
+
+    private fun launcherPackages(): Set<String> {
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        return packageManager.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            .mapNotNull { it.activityInfo?.packageName }
+            .toSet()
+    }
 
     // ---- 吹き出し ----
 

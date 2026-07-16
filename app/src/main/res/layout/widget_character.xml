@@ -9,12 +9,13 @@
 
     <TextView
         android:id="@+id/widget_bubble"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:background="@drawable/bg_bubble"
         android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
-        android:maxLines="3"
+        android:gravity="center"
         android:ellipsize="end"
         android:textSize="13sp"
         android:textColor="#5D4037"
@@ -22,8 +23,8 @@
 
     <ImageView
         android:id="@+id/widget_mascot"
-        android:layout_width="84dp"
-        android:layout_height="84dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:layout_marginTop="2dp"
         android:src="@drawable/mascot"
         android:contentDescription="@string/character_name" />

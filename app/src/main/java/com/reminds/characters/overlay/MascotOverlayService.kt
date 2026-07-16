@@ -122,13 +122,13 @@ class MascotOverlayService : Service() {
             setBackgroundResource(R.drawable.bg_bubble)
             setTextColor(0xFF5D4037.toInt())
             textSize = 13f
-            maxWidth = dp(220)
+            maxWidth = dp(280)
             setPadding(dp(12), dp(8), dp(12), dp(8))
             text = getString(R.string.overlay_idle)
         }
         mascot = ImageView(this).apply {
             setImageResource(R.drawable.mascot)
-            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96)).apply { topMargin = dp(2) }
+            layoutParams = LinearLayout.LayoutParams(dp(68), dp(68)).apply { topMargin = dp(2) }
             contentDescription = getString(R.string.character_name)
         }
         root = LinearLayout(this).apply {
@@ -171,8 +171,8 @@ class MascotOverlayService : Service() {
                     val dy = e.rawY - downY
                     if (abs(dx) > slop || abs(dy) > slop) dragging = true
                     if (dragging) {
-                        params.x = (startPX + dx).toInt().coerceAtLeast(0)
-                        params.y = (startPY + dy).toInt().coerceAtLeast(0)
+                        params.x = (startPX + dx).toInt().coerceIn(0, maxX())
+                        params.y = (startPY + dy).toInt().coerceIn(0, maxY())
                         runCatching { windowManager.updateViewLayout(root, params) }
                     }
                     true
@@ -201,10 +201,24 @@ class MascotOverlayService : Service() {
             while (isActive) {
                 delay(Random.nextLong(3_000, 8_000))
                 if (!dragging && screenOn) {
-                    val maxX = (resources.displayMetrics.widthPixels - rootWidth()).coerceAtLeast(1)
-                    strollTo(Random.nextInt(0, maxX))
+                    strollTo(Random.nextInt(0, maxX().coerceAtLeast(1)))
                 }
             }
+        }
+    }
+
+    private fun maxX(): Int = (resources.displayMetrics.widthPixels - rootWidth()).coerceAtLeast(0)
+
+    private fun maxY(): Int = (resources.displayMetrics.heightPixels - rootHeight()).coerceAtLeast(0)
+
+    /** 吹き出しが伸びて画面からはみ出したら、内側に押し戻す */
+    private fun clampIntoScreen() {
+        val nx = params.x.coerceIn(0, maxX())
+        val ny = params.y.coerceIn(0, maxY())
+        if (nx != params.x || ny != params.y) {
+            params.x = nx
+            params.y = ny
+            runCatching { windowManager.updateViewLayout(root, params) }
         }
     }
 
@@ -233,7 +247,9 @@ class MascotOverlayService : Service() {
         }
     }
 
-    private fun rootWidth(): Int = if (root.width > 0) root.width else dp(160)
+    private fun rootWidth(): Int = if (root.width > 0) root.width else dp(200)
+
+    private fun rootHeight(): Int = if (root.height > 0) root.height else dp(160)
 
     // ---- 吹き出し ----
 
@@ -244,6 +260,8 @@ class MascotOverlayService : Service() {
             dao.observeAll().collectLatest {
                 while (isActive) {
                     bubble.text = bubbleText(dao)
+                    // セリフが長くなって画面端からはみ出したら、レイアウト後に押し戻す
+                    bubble.post { clampIntoScreen() }
                     delay(20_000)
                 }
             }

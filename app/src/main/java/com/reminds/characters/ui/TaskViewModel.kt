@@ -12,6 +12,7 @@ import com.reminds.characters.ai.SmartScheduler
 import com.reminds.characters.data.Task
 import com.reminds.characters.data.toEpochMillis
 import com.reminds.characters.notify.ReminderScheduler
+import com.reminds.characters.widget.CharacterWidgetProvider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -40,6 +41,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             )
             val id = dao.insert(task)
             ReminderScheduler.schedule(getApplication(), task.copy(id = id))
+            CharacterWidgetProvider.updateAllNow(getApplication())
             onScheduled(result.remindAt)
         }
     }
@@ -55,6 +57,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             dao.update(updated)
             ReminderScheduler.cancel(getApplication(), task.id)
             if (!updated.done) ReminderScheduler.schedule(getApplication(), updated)
+            CharacterWidgetProvider.updateAllNow(getApplication())
         }
     }
 
@@ -66,6 +69,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             } else if (task.remindAtMillis > System.currentTimeMillis()) {
                 ReminderScheduler.schedule(getApplication(), task.copy(done = false))
             }
+            CharacterWidgetProvider.updateAllNow(getApplication())
         }
     }
 
@@ -73,6 +77,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             dao.delete(task)
             ReminderScheduler.cancel(getApplication(), task.id)
+            CharacterWidgetProvider.updateAllNow(getApplication())
         }
     }
 

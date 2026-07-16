@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.reminds.characters.MainActivity
 import com.reminds.characters.R
 import com.reminds.characters.data.TaskDatabase
+import com.reminds.characters.widget.CharacterWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +32,8 @@ class ReminderReceiver : BroadcastReceiver() {
                 val task = TaskDatabase.get(context).taskDao().findById(taskId)
                 if (task != null && !task.done) {
                     showBubble(context, taskId, task.bubbleMessage, task.memo)
+                    // ホームのウィジェットの吹き出しも催促セリフに切り替える
+                    CharacterWidgetProvider.updateAllNow(context)
                 }
             } finally {
                 pending.finish()

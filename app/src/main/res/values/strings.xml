@@ -18,6 +18,11 @@
     <string name="ok">OK</string>
     <string name="cancel">キャンセル</string>
 
+    <string name="widget_description">キャラがホーム画面で次のタスクを教えてくれます</string>
+    <string name="widget_empty">やることある？タップしてメモしてね！</string>
+    <string name="widget_next">「%1$s」%2$s にお知らせするね！</string>
+    <string name="widget_deadline_suffix">（〆%sまで）</string>
+
     <string name="channel_name">リマのリマインド</string>
     <string name="channel_description">キャラクターがタスクの時間を教えてくれます</string>
 </resources>

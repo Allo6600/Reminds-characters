@@ -18,6 +18,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE done = 0 AND remindAtMillis > :nowMillis")
     suspend fun pendingReminders(nowMillis: Long): List<Task>
 
+    @Query("SELECT * FROM tasks WHERE done = 0 ORDER BY remindAtMillis ASC LIMIT 1")
+    suspend fun nextPending(): Task?
+
     @Insert
     suspend fun insert(task: Task): Long
 

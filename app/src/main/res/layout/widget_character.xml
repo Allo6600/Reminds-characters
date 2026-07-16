@@ -16,8 +16,7 @@
         android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
         android:gravity="center"
-        android:ellipsize="end"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:textColor="#5D4037"
         android:text="@string/widget_empty" />
 

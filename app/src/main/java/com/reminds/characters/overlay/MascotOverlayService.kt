@@ -122,7 +122,8 @@ class MascotOverlayService : Service() {
             setBackgroundResource(R.drawable.bg_bubble)
             setTextColor(0xFF5D4037.toInt())
             textSize = 13f
-            maxWidth = dp(280)
+            // 画面幅の8割まで吹き出しに使う（上限320dp）
+            maxWidth = minOf((resources.displayMetrics.widthPixels * 0.8f).toInt(), dp(320))
             setPadding(dp(12), dp(8), dp(12), dp(8))
             text = getString(R.string.overlay_idle)
         }

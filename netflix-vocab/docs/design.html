@@ -1,0 +1,1091 @@
+<title>Netflix 英単語自動収集システム — 設計書</title>
+<style>
+  /* ── 明色パレット（既定） ───────────────────────────── */
+  :root{
+    --ground:#eef0f4;
+    --surface:#ffffff;
+    --surface-2:#f6f7fa;
+    --ink:#181b22;
+    --ink-2:#3d4350;
+    --muted:#6b7280;
+    --line:#dcdfe7;
+    --line-2:#e8eaf0;
+    --accent:#b06a10;        /* 未知語の下線＝この製品の中心的な記号 */
+    --accent-soft:#f5e6cd;
+    --known:#1f6f63;         /* 既知 */
+    --known-soft:#dbeeea;
+    --danger:#a33228;
+    --danger-soft:#f7e0dd;
+    --plate:#f7f8fa;         /* 図版の台紙。両テーマ共通で明色に固定 */
+    --plate-line:#dfe3ea;
+    --shadow:0 1px 2px rgba(20,25,40,.06), 0 8px 24px -16px rgba(20,25,40,.28);
+
+    --serif:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",Georgia,"Times New Roman",serif;
+    --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  /* ── 暗色パレット：OS設定が暗色、かつ明示的な明色指定がないとき ── */
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0d1016;
+      --surface:#151922;
+      --surface-2:#1b2029;
+      --ink:#e4e7ee;
+      --ink-2:#bcc3d0;
+      --muted:#8b93a3;
+      --line:#2a303c;
+      --line-2:#232935;
+      --accent:#e0a34a;
+      --accent-soft:#3a2e19;
+      --known:#5cb8a8;
+      --known-soft:#1a3330;
+      --danger:#e08a7d;
+      --danger-soft:#3a221f;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  /* ── 暗色パレット：明示的に暗色を選んだとき ────────────── */
+  :root[data-theme="dark"]{
+    --ground:#0d1016;
+    --surface:#151922;
+    --surface-2:#1b2029;
+    --ink:#e4e7ee;
+    --ink-2:#bcc3d0;
+    --muted:#8b93a3;
+    --line:#2a303c;
+    --line-2:#232935;
+    --accent:#e0a34a;
+    --accent-soft:#3a2e19;
+    --known:#5cb8a8;
+    --known-soft:#1a3330;
+    --danger:#e08a7d;
+    --danger-soft:#3a221f;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.85;
+    -webkit-text-size-adjust:100%;
+  }
+
+  .shell{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 20px 96px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:0 48px;
+  }
+
+  /* ── ヘッダー ───────────────────────────────────── */
+  header.masthead{
+    grid-column:1/-1;
+    padding:64px 0 40px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:44px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin:0 0 18px;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.9rem,5.2vw,3rem);
+    line-height:1.28;
+    letter-spacing:.01em;
+    margin:0 0 18px;
+    text-wrap:balance;
+  }
+  .standfirst{
+    font-size:1.05rem;
+    color:var(--ink-2);
+    max-width:58ch;
+    margin:0 0 28px;
+  }
+  .meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 12px;
+    font-family:var(--mono);
+    font-size:.75rem;
+    color:var(--muted);
+    margin:0;
+    padding:0;
+    list-style:none;
+  }
+  .meta li{
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:3px 9px;
+    background:var(--surface);
+  }
+
+  /* ── 目次（広い画面のみ左に固定） ─────────────────── */
+  nav.toc{display:none;}
+  @media (min-width:1000px){
+    .shell{grid-template-columns:214px minmax(0,1fr);}
+    header.masthead{grid-column:1/-1;}
+    nav.toc{
+      display:block;
+      position:sticky;
+      top:24px;
+      align-self:start;
+      max-height:calc(100vh - 48px);
+      overflow-y:auto;
+      font-size:.82rem;
+      line-height:1.55;
+      padding-bottom:40px;
+    }
+    nav.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;}
+    nav.toc a{
+      color:var(--muted);
+      text-decoration:none;
+      display:grid;
+      grid-template-columns:22px 1fr;
+      gap:6px;
+      border-left:2px solid transparent;
+      padding-left:10px;
+      margin-left:-12px;
+    }
+    nav.toc a:hover,nav.toc a:focus-visible{color:var(--ink);border-left-color:var(--accent);}
+    nav.toc .n{font-family:var(--mono);font-size:.72rem;color:var(--accent);}
+  }
+
+  main{min-width:0;}
+
+  /* ── セクション ─────────────────────────────────── */
+  section{margin:0 0 58px;scroll-margin-top:20px;}
+  h2{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.3rem,3.2vw,1.72rem);
+    line-height:1.4;
+    margin:0 0 6px;
+    text-wrap:balance;
+  }
+  h2 .n{
+    display:block;
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.14em;
+    color:var(--accent);
+    margin-bottom:7px;
+  }
+  h2::after{
+    content:"";
+    display:block;
+    width:44px;
+    height:2px;
+    background:var(--accent);
+    margin:14px 0 22px;
+  }
+  h3{
+    font-family:var(--sans);
+    font-weight:700;
+    font-size:1.02rem;
+    letter-spacing:.01em;
+    margin:34px 0 10px;
+    color:var(--ink);
+  }
+  p{margin:0 0 16px;max-width:70ch;}
+  main a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;text-decoration-thickness:2px;}
+  strong{font-weight:700;}
+  /* 「未知語の下線」— 製品の中核ジェスチャを強調表現に転用 */
+  .u{
+    text-decoration:underline;
+    text-decoration-color:var(--accent);
+    text-decoration-thickness:2px;
+    text-underline-offset:3px;
+    font-weight:700;
+  }
+  ul,ol{max-width:70ch;padding-left:1.25em;margin:0 0 16px;}
+  li{margin-bottom:7px;}
+  li::marker{color:var(--muted);}
+  code{
+    font-family:var(--mono);
+    font-size:.86em;
+    background:var(--surface-2);
+    border:1px solid var(--line-2);
+    border-radius:3px;
+    padding:1px 5px;
+  }
+  pre{
+    font-family:var(--mono);
+    font-size:.8rem;
+    line-height:1.7;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--accent);
+    border-radius:3px;
+    padding:16px 18px;
+    overflow-x:auto;
+    margin:0 0 20px;
+  }
+  pre code{background:none;border:none;padding:0;font-size:1em;}
+
+  /* ── 表 ───────────────────────────────────────── */
+  .tw{overflow-x:auto;margin:0 0 22px;border:1px solid var(--line);border-radius:3px;background:var(--surface);}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;line-height:1.6;min-width:520px;}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;}
+  thead th{
+    font-family:var(--mono);
+    font-size:.7rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    background:var(--surface-2);
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  td.num,th.num{font-variant-numeric:tabular-nums;font-family:var(--mono);white-space:nowrap;}
+
+  /* ── 判定チップ ───────────────────────────────── */
+  .chip{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:.68rem;
+    letter-spacing:.06em;
+    padding:2px 7px;
+    border-radius:2px;
+    white-space:nowrap;
+    border:1px solid transparent;
+  }
+  .chip.no{background:var(--danger-soft);color:var(--danger);border-color:var(--danger);}
+  .chip.yes{background:var(--known-soft);color:var(--known);border-color:var(--known);}
+  .chip.warn{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+
+  /* ── 決定カード ───────────────────────────────── */
+  .decisions{display:grid;gap:14px;margin:0 0 26px;}
+  @media (min-width:760px){.decisions{grid-template-columns:repeat(3,1fr);}}
+  .decision{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-top:3px solid var(--accent);
+    border-radius:3px;
+    padding:18px 18px 20px;
+    box-shadow:var(--shadow);
+  }
+  .decision .k{
+    font-family:var(--mono);
+    font-size:.7rem;
+    letter-spacing:.12em;
+    color:var(--accent);
+    display:block;
+    margin-bottom:9px;
+  }
+  .decision h4{margin:0 0 8px;font-size:.98rem;line-height:1.5;font-weight:700;}
+  .decision p{margin:0;font-size:.85rem;color:var(--ink-2);line-height:1.7;}
+
+  /* ── 注意書き ─────────────────────────────────── */
+  .note{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--accent);
+    border-radius:3px;
+    padding:16px 18px;
+    margin:0 0 22px;
+    font-size:.92rem;
+  }
+  .note p:last-child{margin-bottom:0;}
+  .note .label{
+    font-family:var(--mono);
+    font-size:.68rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:block;
+    margin-bottom:7px;
+  }
+  .note.stop{border-left-color:var(--danger);}
+  .note.stop .label{color:var(--danger);}
+
+  /* ── 図版（台紙は両テーマとも明色に固定して可読性を担保） ── */
+  figure{
+    margin:0 0 24px;
+    border:1px solid var(--plate-line);
+    border-radius:3px;
+    background:var(--plate);
+    overflow:hidden;
+  }
+  figure .plate{padding:18px 12px;overflow-x:auto;}
+  figure .mermaid{display:flex;justify-content:center;min-width:0;}
+  figcaption{
+    font-family:var(--mono);
+    font-size:.7rem;
+    letter-spacing:.08em;
+    color:#5c6270;
+    background:#eceff4;
+    border-top:1px solid var(--plate-line);
+    padding:8px 14px;
+  }
+
+  /* ── フェーズ ─────────────────────────────────── */
+  .phases{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;}
+  .phases li{
+    display:grid;
+    grid-template-columns:76px 1fr;
+    gap:0 18px;
+    padding:18px 0;
+    border-bottom:1px solid var(--line-2);
+    margin:0;
+  }
+  .phases li:last-child{border-bottom:none;}
+  .phases .ph{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.08em;
+    color:var(--accent);
+    padding-top:4px;
+  }
+  .phases h4{margin:0 0 4px;font-size:1rem;font-weight:700;}
+  .phases .dur{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-left:8px;font-weight:400;letter-spacing:.04em;}
+  .phases p{margin:6px 0 0;font-size:.88rem;color:var(--ink-2);}
+  .phases ul{margin:8px 0 0;font-size:.88rem;color:var(--ink-2);}
+
+  footer{
+    grid-column:1/-1;
+    border-top:1px solid var(--line);
+    margin-top:20px;
+    padding-top:24px;
+    font-size:.8rem;
+    color:var(--muted);
+    font-family:var(--mono);
+  }
+
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;}}
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">System Design — v0.1 / 実装前</p>
+    <h1>Netflix 英単語<br>自動収集システム</h1>
+    <p class="standfirst">視聴体験を止めずに、自分のレベルより難しい単語だけを拾い、あとで復習できる形で貯める。PC拡張とスマホアプリで<span class="u">判定ロジックを1つだけ持つ</span>ための設計。</p>
+    <ul class="meta">
+      <li>2026-08-10</li>
+      <li>ステータス: 設計案</li>
+      <li>対象: Chrome拡張 / Android</li>
+      <li>コード実装前</li>
+    </ul>
+  </header>
+
+  <nav class="toc" aria-label="目次">
+    <ol>
+      <li><a href="#s0"><span class="n">00</span><span>結論サマリ</span></a></li>
+      <li><a href="#s1"><span class="n">01</span><span>スコープと前提</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>全体構成</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>データフロー</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>ロジック共有</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>レベルデータ</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>PC版の詳細</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>モバイル版の詳細</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>既知単語のUX</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>スキーマ設計</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>カード生成</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>技術選定の理由</span></a></li>
+      <li><a href="#s12"><span class="n">12</span><span>リスクと検証</span></a></li>
+      <li><a href="#s13"><span class="n">13</span><span>フェーズ計画</span></a></li>
+      <li><a href="#s14"><span class="n">14</span><span>同期</span></a></li>
+      <li><a href="#s15"><span class="n">15</span><span>法務・プライバシー</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- 0 -->
+    <section id="s0">
+      <h2><span class="n">00</span>結論サマリ</h2>
+      <p>この設計で重要な判断は3つです。</p>
+      <div class="decisions">
+        <div class="decision">
+          <span class="k">判断 1</span>
+          <h4>コアを純粋な TypeScript パッケージに切り出す</h4>
+          <p>レベル判定と既知単語管理は環境に依存しない純関数にできる。ストレージだけをアダプタで差し替え、PC拡張とスマホで同じコードを動かす。</p>
+        </div>
+        <div class="decision">
+          <span class="k">判断 2</span>
+          <h4>モバイルは React Native</h4>
+          <p>上のコアを「移植」ではなく <code>import</code> するため。Kotlin で書き直すと判定ロジックが二重管理になり、必ず食い違う。</p>
+        </div>
+        <div class="decision">
+          <span class="k">判断 3</span>
+          <h4>PC版が主、モバイルは従</h4>
+          <p>後述の技術的制約により、スマホ単独で高精度に字幕を取ることは原理的に難しい。ここを楽観視すると計画が崩れる。</p>
+        </div>
+      </div>
+      <div class="note stop">
+        <span class="label">先に潰すべき最大のリスク</span>
+        <p><strong>①Netflix の上に Android オーバーレイを出せるか</strong>／<strong>②BGM混じりの映画音声で音声認識がどれだけ使えるか</strong>。この2つの結果次第でモバイル版の位置づけが変わるため、実装より先に検証します（第12章）。</p>
+      </div>
+    </section>
+
+    <!-- 1 -->
+    <section id="s1">
+      <h2><span class="n">01</span>スコープと前提</h2>
+      <h3>作るもの</h3>
+      <ul>
+        <li><strong>PC版</strong> — Chrome 拡張。Netflix Web の字幕を取得し、未知単語を検出・蓄積する</li>
+        <li><strong>モバイル版</strong> — Android アプリ。マイク経由の音声認識でテキスト化し、オーバーレイ字幕として表示。タップで単語カード生成</li>
+        <li><strong>共有コア</strong> — レベル判定・既知単語管理・単語正規化</li>
+        <li><strong>復習</strong> — 未知単語リスト、SRS（間隔反復）、Anki/CSV エクスポート</li>
+      </ul>
+      <h3>作らないもの</h3>
+      <ul>
+        <li>動画・音声の保存（<strong>明示的な非目標</strong>。音声はテキスト化した瞬間に破棄）</li>
+        <li>字幕ファイルそのものの保存・再配布</li>
+        <li>Netflix 以外のプラットフォーム対応（差し込める設計にはするが実装しない）</li>
+        <li>iOS 版（理由は第7章）</li>
+      </ul>
+      <h3>「Language Reactor とロジック共有」の解釈</h3>
+      <p>Language Reactor はサードパーティ製品なので、その内部コードに手を入れることはできません。取れる道は2つです。</p>
+      <ul>
+        <li><strong>(A) 自作のPC拡張を作り、そこと共有する</strong> ← 本設計はこちら</li>
+        <li>(B) Language Reactor をそのまま使い、その単語リスト書き出し（CSV/JSON）を取り込む口だけ用意する</li>
+      </ul>
+      <p>(B) は Phase 1 の暫定手段として有効なので<strong>インポート機能は作ります</strong>。ただし本命は (A) です。</p>
+    </section>
+
+    <!-- 2 -->
+    <section id="s2">
+      <h2><span class="n">02</span>全体構成</h2>
+      <figure>
+        <div class="plate">
+          <pre class="mermaid">graph TB
+    subgraph PC["PC (Chrome)"]
+        NF1[Netflix Web Player]
+        CS[Content Script<br/>字幕キャプチャ]
+        SW[Service Worker<br/>判定・永続化]
+        UI1[拡張UI<br/>単語リスト/復習]
+        NF1 -->|DOM| CS
+        CS <-->|message| SW
+        SW <--> UI1
+    end
+    subgraph MB["Android"]
+        NF2[Netflix App]
+        MIC[マイク入力]
+        STT[STT エンジン<br/>on-device]
+        OVL[オーバーレイ字幕]
+        UI2[アプリUI]
+        NF2 -.音を鳴らす.-> MIC
+        MIC --> STT
+        STT -->|テキストのみ| OVL
+        OVL <--> UI2
+    end
+    CORE["@vocab/core (TypeScript)<br/>正規化 / レベル判定 / 既知単語 / SRS"]
+    DATA[("レベルデータ<br/>CEFR-J + NGSL/TSL + SUBTLEX")]
+    DICT[("辞書<br/>EJDict / Wiktionary")]
+    SW --> CORE
+    UI2 --> CORE
+    CORE --> DATA
+    CORE --> DICT
+    IDB[("IndexedDB")]
+    SQL[("SQLite")]
+    SW --> IDB
+    UI2 --> SQL
+    IDB <-.Phase 5.-> SYNC[同期レイヤ<br/>Google Drive]
+    SQL <-.Phase 5.-> SYNC</pre>
+        </div>
+        <figcaption>図1 — 全体構成。コアは両環境から参照され、ストレージだけが分かれる</figcaption>
+      </figure>
+
+      <h3>レイヤ構成</h3>
+      <pre><code>@vocab/core            純粋TS。I/Oを持たない
+  ├─ normalize/        トークナイズ、レンマ化、固有名詞除外
+  ├─ level/            CEFR-J・頻度からの難易度判定
+  ├─ vocab/            既知/未知/学習中の状態遷移
+  ├─ srs/              間隔反復のスケジューリング
+  └─ ports/            ストレージ・辞書のインタフェース定義（実装なし）
+
+@vocab/data            ビルド時に生成される静的JSON
+@vocab/storage-idb     IndexedDB 実装（PC拡張用）
+@vocab/storage-sqlite  SQLite 実装（モバイル用）
+apps/extension         Chrome 拡張 (MV3)
+apps/mobile            React Native (Android)</code></pre>
+      <p><span class="u">コアは <code>ports/</code> にインタフェースだけ置き、実装を持ちません。</span>これで「同じ判定が PC でもスマホでも1行も違わずに動く」ことが保証され、テストもコアだけで完結します。</p>
+    </section>
+
+    <!-- 3 -->
+    <section id="s3">
+      <h2><span class="n">03</span>データフロー</h2>
+
+      <h3>PC版 — 字幕1行が未知単語になるまで</h3>
+      <figure>
+        <div class="plate">
+          <pre class="mermaid">sequenceDiagram
+    participant N as Netflix Player
+    participant C as Content Script
+    participant W as Service Worker
+    participant D as IndexedDB
+    N->>C: 字幕テキストが描画される
+    C->>C: 直前と同一なら破棄（重複排除）
+    C->>W: {text, videoId, timestamp}
+    W->>W: tokenize → lemmatize → 固有名詞を除外
+    W->>D: 既知単語セット取得（起動時にキャッシュ）
+    W->>W: レベル判定（CEFR-J / Zipf頻度）
+    W->>D: encounters に文脈文ごと追記
+    W->>D: words を upsert
+    W-->>C: 未知単語の位置を返す
+    C->>N: 字幕上の該当語に下線を描画</pre>
+        </div>
+        <figcaption>図2 — PC版の収集フロー</figcaption>
+      </figure>
+      <div class="note">
+        <span class="label">実装上の落とし穴</span>
+        <p>Chrome 拡張の Content Script は <strong>netflix.com のオリジン</strong>で動くため、そこで IndexedDB を開くと「Netflix のデータベース」になります。永続化は必ず <strong>Service Worker（拡張オリジン）側</strong>で行うこと。ここを間違えると、Netflix 側のストレージ削除で学習データが消えます。</p>
+      </div>
+
+      <h3>モバイル版 — 音から単語カードまで</h3>
+      <figure>
+        <div class="plate">
+          <pre class="mermaid">sequenceDiagram
+    participant NX as Netflix (音声)
+    participant M as マイク
+    participant S as STT エンジン
+    participant O as オーバーレイ
+    participant U as ユーザー
+    participant DB as SQLite
+    NX->>M: スピーカー出力
+    M->>S: PCM ストリーム（数秒分のみ）
+    S->>S: 部分認識 → 確定テキスト
+    S--x M: 音声バッファを即破棄
+    S->>O: 確定テキストを字幕として描画
+    O->>O: coreで判定し未知語を色付け
+    U->>O: 単語をタップ
+    O->>DB: encounters に文脈ごと保存
+    O->>U: カード表示（意味・例文・「知ってる」）</pre>
+        </div>
+        <figcaption>図3 — モバイル版の収集フロー。音声はファイル化されない</figcaption>
+      </figure>
+      <p>音声は固定長リングバッファ上にのみ存在し、ファイル化・アップロードを一切行いません。オンデバイス STT を既定にすることで、この保証をコードレベルで担保します。</p>
+    </section>
+
+    <!-- 4 -->
+    <section id="s4">
+      <h2><span class="n">04</span>ロジックの共有<br>—— 検討事項 1 への回答</h2>
+      <p><strong>共有できます。</strong>レベル判定・既知単語管理は「単語列 + 参照データ」だけで決まる純関数なので、環境非依存に書けます。阻害要因は2つだけです。</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>阻害要因</th><th>対策</th></tr></thead>
+          <tbody>
+            <tr><td>言語の違い（TS と Kotlin）</td><td>モバイルを React Native にして TS に統一。Kotlin はオーバーレイ・マイク・STT のネイティブモジュールのみ</td></tr>
+            <tr><td>ストレージAPIの違い（IndexedDB と SQLite）</td><td>コアは <code>VocabRepository</code> インタフェースにのみ依存し、実装を注入する</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ポート定義（コアが要求する契約）</h3>
+      <pre><code>export interface VocabRepository {
+  getKnownLemmas(): Promise&lt;Set&lt;string&gt;&gt;;        // 起動時に一括ロード
+  getWord(lemma: string): Promise&lt;WordRecord | null&gt;;
+  upsertWord(w: WordRecord): Promise&lt;void&gt;;
+  addEncounter(e: EncounterRecord): Promise&lt;void&gt;;
+  listByStatus(s: WordStatus, opt?: Page): Promise&lt;WordRecord[]&gt;;
+  listDue(now: number): Promise&lt;WordRecord[]&gt;;    // SRS用
+}
+
+export interface LevelDataSource {
+  lookup(lemma: string): LevelInfo | undefined;   // 同期。メモリ常駐前提
+}</code></pre>
+
+      <h3>判定アルゴリズム</h3>
+      <pre><code>function judge(token: Token, ctx: JudgeContext): Verdict {
+  if (ctx.known.has(token.lemma))  return 'known';
+  if (isProperNoun(token))         return 'skip';   // 人名・地名
+  if (isFunctionWord(token.lemma)) return 'skip';   // 冠詞・前置詞
+  if (token.lemma.length &lt;= 2)     return 'skip';
+
+  const info = ctx.levels.lookup(token.lemma);
+  if (!info) return 'unknown';       // 辞書に無い＝低頻度＝難語
+
+  const tooHard =
+    (info.cefr &amp;&amp; cefrRank(info.cefr) &gt; cefrRank(ctx.userLevel)) ||
+    (info.zipf &amp;&amp; info.zipf &lt; ctx.zipfThreshold);
+
+  return tooHard ? 'unknown' : 'known';
+}</code></pre>
+      <div class="note">
+        <span class="label">体感品質を最も左右する箇所</span>
+        <p>ドラマは登場人物名だらけなので、<strong>固有名詞を弾かないと未知単語リストが人名で埋まります</strong>。3段構えで対処します —— ①品詞タガーで <code>ProperNoun</code> 判定、②文中で大文字始まり かつ レベル辞書に無い、③<strong>作品ごとの名前リストを自動学習</strong>（同一作品内で3回以上出た未知の大文字語は固有名詞とみなす）。</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="s5">
+      <h2><span class="n">05</span>レベルデータの入手と形式<br>—— 検討事項 2 への回答</h2>
+      <div class="tw">
+        <table>
+          <thead><tr><th>データ</th><th>内容</th><th class="num">規模</th><th>ライセンス</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>CEFR-J Wordlist</strong><br><span style="color:var(--muted);font-size:.9em">東京外大・投野研</span></td>
+              <td>英単語に A1〜B2 のCEFRレベル付与。日本人学習者向けに設計</td>
+              <td class="num">約7,800語</td><td>研究・非商用で無償</td><td><strong>主軸のレベル判定</strong></td>
+            </tr>
+            <tr>
+              <td><strong>NGSL / NAWL / TSL / BSL</strong><br><span style="color:var(--muted);font-size:.9em">Browne et al.</span></td>
+              <td>一般英語2,800語、学術、<strong>TOEIC頻出1,200語</strong>、ビジネス</td>
+              <td class="num">各1〜3千語</td><td>CC BY-SA</td><td>TOEIC志向のラベル</td>
+            </tr>
+            <tr>
+              <td><strong>SUBTLEX-US</strong><br><span style="color:var(--muted);font-size:.9em">Brysbaert &amp; New</span></td>
+              <td><strong>映画・TV字幕コーパス</strong>由来の語頻度。Zipf値</td>
+              <td class="num">約7万語</td><td>非商用研究で無償</td><td><strong>本用途に最適な頻度指標</strong></td>
+            </tr>
+            <tr><td><strong>EJDict-hand</strong></td><td>英和辞書データ</td><td class="num">約5.5万語</td><td>パブリックドメイン</td><td>オフライン語義</td></tr>
+            <tr><td><strong>Wiktextract / kaikki.org</strong></td><td>語義・例文・発音のJSONダンプ</td><td class="num">大規模</td><td>CC BY-SA</td><td>例文の補完</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note stop">
+        <span class="label">英検レベルについての注意</span>
+        <p>旺文社「でる順パス単」等の市販単語リストは<strong>著作物であり、取り込み・再配布はできません</strong>。英検級で表示したい場合は、英検協会が公表している英検↔CEFR 対応を使い、CEFR-J のレベルから換算します。つまり<span class="u">保持するのは CEFR、表示だけ英検に変換</span>する。権利上クリーンで、UIの分かりやすさも保てます。</p>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>英検</th><th>3級</th><th>準2級</th><th>2級</th><th>準1級</th><th>1級</th></tr></thead>
+          <tbody><tr><td><strong>CEFR（概ね）</strong></td><td>A1</td><td>A2</td><td>B1</td><td>B2</td><td>C1</td></tr></tbody>
+        </table>
+      </div>
+
+      <h3>ビルド時のデータパイプライン</h3>
+      <pre><code>tools/build-leveldata/
+  ├─ fetch/      CEFR-J(xlsx) / NGSL(csv) / TSL(csv) / SUBTLEX(txt)
+  ├─ normalize/  レンマ化・表記ゆれ統合・重複解決
+  ├─ merge/      優先順位: CEFR-J > NGSL段位 > Zipfのみ
+  └─ emit/       levels.json  (gzip後 約300〜500KB)</code></pre>
+      <pre><code>{ "l": "reluctant", "c": "B2", "z": 3.9, "t": 0, "p": "adj" }</code></pre>
+      <p><code>l</code>=lemma, <code>c</code>=CEFR, <code>z</code>=Zipf頻度, <code>t</code>=TSL順位, <code>p</code>=品詞。キーを1文字にするだけで配布サイズが2〜3割縮みます。実行時は <code>Map</code> としてメモリ常駐（数MB程度）。</p>
+    </section>
+
+    <!-- 6 -->
+    <section id="s6">
+      <h2><span class="n">06</span>PC版（Chrome 拡張）</h2>
+      <h3>字幕の取得方法 — 2案</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>案</th><th>方法</th><th>長所</th><th>短所</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="chip yes">採用</span> <strong>A. DOM監視</strong></td>
+              <td><code>.player-timedtext</code> を <code>MutationObserver</code> で監視</td>
+              <td>実装が単純で堅牢。表示中の字幕がそのまま取れる</td>
+              <td>表示された分しか取れない。早送りで取りこぼす</td>
+            </tr>
+            <tr>
+              <td><span class="chip warn">保留</span> <strong>B. マニフェスト傍受</strong></td>
+              <td><code>JSON.parse</code> をフックし字幕トラックURLを取得、TTMLを丸ごと取る</td>
+              <td>エピソード全文＋タイムコードが一度に入手できる</td>
+              <td>内部仕様変更で壊れやすい。字幕全文の保持は権利上グレー</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>A を採用</strong>。B の「全文を落として保存する」挙動が非目標（字幕を保存しない）と衝突するためです。A なら「視聴した箇所の、単語と文脈文だけ」が残る形になり、目的にも権利上も素直です。</p>
+
+      <h3>拡張の構成（Manifest V3）</h3>
+      <pre><code>content.ts   字幕DOM監視 + 未知語の下線描画 + クリック処理
+worker.ts    判定エンジン・IndexedDB・レベルデータ常駐
+popup.tsx    今エピソードの未知語サマリ
+options.tsx  レベル設定・キャリブレーション・エクスポート
+review.tsx   復習（SRS）画面</code></pre>
+
+      <h3>視聴体験を壊さないための配慮</h3>
+      <ul>
+        <li>ハイライトは<strong>細い下線のみ</strong>。背景色は使わない（視聴の邪魔になる）</li>
+        <li>ポップアップは<strong>一時停止時のみ自動表示</strong>。再生中はクリックしたときだけ</li>
+        <li>既定は「収集だけして<strong>エピソード終了時にまとめて提示</strong>」モード</li>
+      </ul>
+    </section>
+
+    <!-- 7 -->
+    <section id="s7">
+      <h2><span class="n">07</span>モバイル版（Android）</h2>
+      <h3>まず、正直な技術評価</h3>
+      <p>依頼の想定アプローチ（マイク → STT → 字幕表示）は<strong>唯一実現可能な経路</strong>ですが、精度に明確な限界があります。他の一見良さそうな方法が全て塞がれていることを先に共有します。</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>代替案</th><th class="num">可否</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>画面キャプチャして字幕をOCR</td><td class="num"><span class="chip no">不可</span></td><td>Netflix は DRM 保護のため <code>FLAG_SECURE</code> を使用。<code>MediaProjection</code> では<strong>黒画面</strong>しか取れない</td></tr>
+            <tr><td>端末内部音声を直接キャプチャ<br><code>AudioPlaybackCapture</code> (API 29+)</td><td class="num"><span class="chip no">ほぼ不可</span></td><td>再生アプリが許可した音声しか取れない。DRM動画アプリは通常 <code>ALLOW_CAPTURE_BY_NONE</code>。Phase 0 で実測</td></tr>
+            <tr><td>アクセシビリティサービスで字幕を読む</td><td class="num"><span class="chip no">不可</span></td><td>字幕は動画フレーム内に描画されており、Viewツリー上にテキストとして存在しない</td></tr>
+            <tr><td><strong>マイクで拾って STT</strong></td><td class="num"><span class="chip warn">可</span></td><td>スピーカー再生が前提。BGM・効果音・複数話者で認識率が落ちる</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <span class="label">位置づけの結論</span>
+        <p>モバイルは<strong>「補助的な収集端末 兼 主要な復習端末」</strong>とします。単語収集の主戦場は PC 版。これは妥協ではなく投資対効果として合理的です —— 復習こそスマホの独壇場なので。</p>
+      </div>
+
+      <h3>STT エンジンの選定</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>候補</th><th>動作</th><th>コスト</th><th>評価</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Vosk</strong></td><td>オンデバイス</td><td>無料</td><td>モデル約50MB、連続認識に強い。<strong>第一候補</strong></td></tr>
+            <tr><td><strong>whisper.cpp</strong> (base.en)</td><td>オンデバイス</td><td>無料</td><td>精度は上。発熱・電池・遅延が課題。第二候補</td></tr>
+            <tr><td>Android <code>SpeechRecognizer</code></td><td>端末依存</td><td>無料</td><td>連続認識に制限。無音で切れる。不向き</td></tr>
+            <tr><td>Cloud STT</td><td>通信</td><td>従量</td><td>精度最良だが<strong>音声が外部に出る</strong>。既定にしない</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>オーバーレイ実装</h3>
+      <ul>
+        <li><code>TYPE_APPLICATION_OVERLAY</code> + <code>SYSTEM_ALERT_WINDOW</code> 権限</li>
+        <li><strong>画面下部に固定した半透明の字幕バー</strong>（歩き回らせない。字幕は動かさない）</li>
+        <li>単語ごとに <code>Spannable</code> のクリック領域を持たせ、タップでカード表示</li>
+        <li><code>FLAG_NOT_FOCUSABLE</code> を付け、Netflix の再生操作を阻害しない</li>
+      </ul>
+      <div class="note stop">
+        <span class="label">既知のリスク</span>
+        <p>Android 12 以降、アプリは <code>hideOverlayWindows()</code> で他アプリのオーバーレイを隠せます。Netflix がこれを使っている場合、字幕バーが表示されません。<strong>Phase 0 の最優先検証項目</strong>です。</p>
+      </div>
+
+      <h3>音声の扱い（非保存の担保）</h3>
+      <pre><code>マイク → AudioRecord (16kHz mono)
+       → 固定長リングバッファ（直近3秒 = 96KB）
+       → STT へ push
+       → バッファは上書きされ続ける
+       → ファイルI/Oのコードを一切持たない</code></pre>
+      <p><span class="u">「保存しない」は設定項目ではなくアーキテクチャで保証します。</span>書き出しの実装が存在しません。</p>
+
+      <h3>iOS を初期スコープ外にする理由</h3>
+      <p>iOS には<strong>他アプリの上に重ねる仕組みが存在しません</strong>。加えてバックグラウンドでのマイク常時使用も制約が強く、「Netflix を見ながら字幕を重ねる」という中心体験が成立しません。iOS 対応するなら「集めた単語を復習するだけのアプリ」になります。</p>
+    </section>
+
+    <!-- 8 -->
+    <section id="s8">
+      <h2><span class="n">08</span>既知単語登録の UX<br>—— 検討事項 3 への回答</h2>
+      <div class="note">
+        <span class="label">最大の課題</span>
+        <p>普通に作ると、ユーザーは既知の単語を<strong>数千回タップ</strong>させられます。この種のツールが続かない最大の理由がこれです。したがって「1語ずつ登録する UI」より先に<strong>一括で推定する仕組み</strong>を作ります。</p>
+      </div>
+
+      <h3>レベルキャリブレーション（初回、約2分）</h3>
+      <figure>
+        <div class="plate">
+          <pre class="mermaid">graph LR
+    A[頻度帯ごとに<br/>5語×10帯 を出題] --> B[知っている語を<br/>タップで選ぶ]
+    B --> C[各帯の正答率から<br/>語彙サイズを推定]
+    C --> D[推定サイズ以下の<br/>頻度帯を一括 known]
+    D --> E[以降は差分だけ<br/>1タップで登録]</pre>
+        </div>
+        <figcaption>図4 — 初期登録を数千タップから50タップに減らす</figcaption>
+      </figure>
+      <ul>
+        <li>Zipf 頻度で層別サンプリングし、<strong>50語のテストで語彙規模を推定</strong></li>
+        <li>「あなたは約8,000語レベル（英検2級相当）」と提示し、しきい値の初期値に反映</li>
+      </ul>
+
+      <h3>日常運用の登録フロー</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>場面</th><th>操作</th><th>結果</th></tr></thead>
+          <tbody>
+            <tr><td>字幕上のハイライト語</td><td><strong>長押し</strong>（PCは <code>K</code> キー）</td><td>即 known。トーストで「元に戻す」</td></tr>
+            <tr><td>単語カード上</td><td>「知ってる」1回</td><td>known。カードを閉じリストからも消える</td></tr>
+            <tr><td>復習リスト</td><td><strong>右スワイプ = 知ってる／左 = 残す</strong></td><td>一覧を高速に間引ける</td></tr>
+            <tr><td>固有名詞だった</td><td>「名前だった」</td><td><code>ignored</code>。作品別の名前リストにも追加</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>「元に戻す」は必ず用意します。</strong>誤タップで既知にすると二度と出てこなくなり、静かに学習機会を失うためです。</p>
+
+      <h3>状態遷移</h3>
+      <pre><code>        初出
+         ↓
+     [unknown] ──「覚えたい」──→ [learning] ──SRS合格──→ [known]
+         │                          │
+         └──「知ってる」────────────┴──────────────→ [known]
+         │
+         └──「名前だった/記号」───────────────────→ [ignored]</code></pre>
+    </section>
+
+    <!-- 9 -->
+    <section id="s9">
+      <h2><span class="n">09</span>データモデルと IndexedDB スキーマ<br>—— 検討事項 4 への回答</h2>
+      <h3>設計方針</h3>
+      <ul>
+        <li><strong><code>lemma</code>（小文字の原形）を単語の主キー</strong>にする。表層形は出現記録側に持つ</li>
+        <li><strong>単語（words）と出現（encounters）を分離</strong>。同じ語が何度出ても単語は1レコード</li>
+        <li>全レコードに <code>updatedAt</code> / <code>deviceId</code> / <code>deleted</code> を持たせ、<span class="u">Phase 5 の同期に最初から備える</span>（後付けは非常に高くつく）</li>
+      </ul>
+
+      <h3>スキーマ定義（db version 1）</h3>
+      <pre><code>// ---------- words: 単語1件 = 1レコード ----------
+interface WordRecord {
+  lemma: string;            // ★keyPath。小文字・原形
+  pos?: string;
+  cefr?: 'A1'|'A2'|'B1'|'B2'|'C1'|'C2';
+  zipf?: number;
+  status: 'unknown' | 'learning' | 'known' | 'ignored';
+  seenCount: number;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  srsDue?: number;          // 次回出題時刻(epoch ms)
+  srsInterval?: number;     // 日数
+  srsEase?: number;
+  updatedAt: number;        // 同期用
+  deviceId: string;
+  deleted?: boolean;        // トゥームストーン
+}
+// indexes: by_status, by_due(srsDue), by_cefr,
+//          by_updated(updatedAt), by_lastSeen
+
+// ---------- encounters: 出会った文脈 ----------
+interface EncounterRecord {
+  id: number;               // ★autoIncrement
+  lemma: string;
+  surface: string;          // 実際の表示形 (was, running)
+  sentence: string;         // 文脈文（学習価値の中心）
+  sourceId: string;
+  positionMs?: number;
+  capturedAt: number;
+  origin: 'pc' | 'mobile';
+  confidence?: number;      // STT由来のときの信頼度
+}
+// indexes: by_lemma, by_source, by_captured
+
+// ---------- sources: 作品・エピソード ----------
+interface SourceRecord {
+  id: string;               // ★ "netflix:80192098"
+  platform: 'netflix';
+  title: string;
+  season?: number;
+  episode?: number;
+  firstWatchedAt: number;
+}
+
+// ---------- cards / settings / properNouns ----------
+interface CardRecord {
+  lemma: string;            // ★keyPath
+  definitionJa?: string;
+  definitionEn?: string;
+  examples: string[];
+  phonetic?: string;
+  generatedBy: 'dict' | 'llm';
+  updatedAt: number;
+}</code></pre>
+
+      <h3>なぜこの形か</h3>
+      <ul>
+        <li><code>words.by_due</code> があると、復習対象の抽出が <code>IDBKeyRange.upperBound(now)</code> 一発で済む</li>
+        <li><strong><code>encounters</code> を分離</strong>することで「この単語、あのドラマのあの場面のやつだ」という<strong>記憶に最も効く情報</strong>が残る。単語帳アプリとの決定的な差はここ</li>
+        <li><code>by_updated</code> は同期の差分抽出用。これがないと毎回全件比較になる</li>
+      </ul>
+
+      <h3>モバイル側（SQLite）</h3>
+      <p>同じ論理スキーマを SQLite のテーブルとして持ちます。カラム名・型は 1:1 対応させ、<code>@vocab/storage-sqlite</code> が <code>VocabRepository</code> を実装します。<strong>コアから見れば両者は区別できません。</strong></p>
+
+      <h3>インポート／エクスポート</h3>
+      <ul>
+        <li><strong>エクスポート</strong> — JSON（全データ）／CSV／<strong>Anki 形式</strong>（表: 単語、裏: 語義+例文+出典）</li>
+        <li><strong>インポート</strong> — 上記 JSON、および Language Reactor 等の CSV（列マッピング画面付き）</li>
+      </ul>
+    </section>
+
+    <!-- 10 -->
+    <section id="s10">
+      <h2><span class="n">10</span>単語カードの生成</h2>
+      <figure>
+        <div class="plate">
+          <pre class="mermaid">graph LR
+    T[単語タップ] --> L{オフライン辞書に<br/>あるか}
+    L -->|Yes| I[即座にカード表示<br/>≈10ms]
+    L -->|No| P[プレースホルダ]
+    I --> E{LLM補強が<br/>ONか}
+    P --> E
+    E -->|Yes| Q[背後で文脈依存の<br/>語義を生成]
+    Q --> U[カードを更新]
+    E -->|No| F[完了]</pre>
+        </div>
+        <figcaption>図5 — 辞書で即応答し、LLMは後から追いつく</figcaption>
+      </figure>
+      <ul>
+        <li><strong>一次情報はオフライン辞書（EJDict）</strong>。通信ゼロ・即応答で視聴体験を止めない</li>
+        <li><strong>LLM は「補強」に限定</strong>。字幕の文脈文を渡して「この場面でのこの語の意味」を生成。1エピソード分をまとめて投げればコストは実用範囲</li>
+        <li>生成結果は <code>cards</code> にキャッシュし、同じ語で二度課金しない</li>
+      </ul>
+    </section>
+
+    <!-- 11 -->
+    <section id="s11">
+      <h2><span class="n">11</span>技術選定の理由</h2>
+      <div class="tw">
+        <table>
+          <thead><tr><th>領域</th><th>選定</th><th>理由</th><th>却下した案</th></tr></thead>
+          <tbody>
+            <tr><td>コア言語</td><td><strong>TypeScript</strong></td><td>PC拡張が必然的にTS。モバイルも揃えれば共有可能</td><td>Kotlin Multiplatform（拡張側の手間、エコシステムの薄さ）</td></tr>
+            <tr><td>モバイル</td><td><strong>React Native</strong></td><td>TSコアを直接 import できる</td><td>ネイティブKotlin（ロジック二重管理）、Flutter（Dartで共有不可）</td></tr>
+            <tr><td>PC</td><td><strong>Chrome拡張 MV3</strong></td><td>Netflix Web に触れる唯一の現実的手段</td><td>Electronラッパ（DRM再生不可）</td></tr>
+            <tr><td>字幕取得</td><td><strong>DOM監視</strong></td><td>単純・目的に合致・字幕全文を保存しない</td><td>manifest傍受（脆く、権利上グレー）</td></tr>
+            <tr><td>STT</td><td><strong>Vosk</strong></td><td>無料・連続認識・音声が外に出ない</td><td>クラウドSTT（コスト/プライバシー）</td></tr>
+            <tr><td>レベル判定</td><td><strong>CEFR-J + SUBTLEX</strong></td><td>日本人学習者向け設計 + 字幕由来の頻度</td><td>英検市販単語集（著作権）</td></tr>
+            <tr><td>辞書</td><td><strong>EJDict + LLM補強</strong></td><td>オフライン即応 + 文脈依存の精度</td><td>LLMのみ（遅い・高い）</td></tr>
+            <tr><td>保存(PC)</td><td><strong>IndexedDB</strong></td><td>大量レコード・インデックス検索・拡張オリジンで安全</td><td>chrome.storage.local（容量とクエリ性能）</td></tr>
+            <tr><td>保存(Mobile)</td><td><strong>SQLite</strong></td><td>RNで枯れている。同一論理スキーマ</td><td>Realm（依存が重い）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section id="s12">
+      <h2><span class="n">12</span>リスクと Phase 0 での検証</h2>
+      <div class="note stop">
+        <span class="label">最重要</span>
+        <p>実装に入る前に以下を1〜2週で潰します。<strong>ここで結果が出ないまま先に進むと、作ったものが動かない可能性があります。</strong></p>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">#</th><th>検証項目</th><th>方法</th><th>方針転換の基準</th></tr></thead>
+          <tbody>
+            <tr><td class="num">R1</td><td>Netflix の上にオーバーレイを出せるか</td><td>最小アプリで字幕バーを出し、Netflix 再生中に表示・タップを確認</td><td><strong>表示されない → モバイルは「復習専用アプリ」に転換</strong></td></tr>
+            <tr><td class="num">R2</td><td>映画音声の STT 精度</td><td>会話劇・アクション・ドキュメンタリー各10分を Vosk / whisper で書き起こし、公式字幕と WER 比較</td><td><strong>WER &gt; 50% → 常時検出を諦め、タップ時のみ高精度認識に縮退</strong></td></tr>
+            <tr><td class="num">R3</td><td>内部音声キャプチャの可否</td><td><code>AudioPlaybackCapture</code> を Netflix 再生中に実行</td><td>取得できれば R2 が大幅改善（期待値は低い）</td></tr>
+            <tr><td class="num">R4</td><td>Netflix Web の字幕DOM構造</td><td>映画/シリーズ/アニメ で <code>.player-timedtext</code> の有無を確認</td><td>画像字幕が多い → 対応タイトルを明示する方針に</td></tr>
+            <tr><td class="num">R5</td><td>レベルデータの実用性</td><td>実際の1エピソードを判定し、未知語候補を人手評価</td><td>誤検出が3割超 → 除外ロジックを強化</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section id="s13">
+      <h2><span class="n">13</span>フェーズ計画</h2>
+      <ol class="phases">
+        <li>
+          <span class="ph">PHASE 0</span>
+          <div>
+            <h4>実現可能性検証<span class="dur">1〜2週</span></h4>
+            <p>R1〜R5 の検証と結果の記録。</p>
+            <p><strong>成果物</strong> — 「モバイルで何ができて何ができないか」が数字で確定した判断材料</p>
+          </div>
+        </li>
+        <li>
+          <span class="ph">PHASE 1</span>
+          <div>
+            <h4>PC版 MVP<span class="dur">2〜3週</span></h4>
+            <ul>
+              <li>字幕キャプチャ → 未知語検出 → IndexedDB 保存</li>
+              <li>レベルデータのビルドパイプライン</li>
+              <li>未知単語リスト + ワンクリック既知登録 + CSV/Anki エクスポート</li>
+            </ul>
+            <p><strong>成果物</strong> — 単体で「Netflix を見ると単語リストが貯まる」状態。ここで一度実運用してみる</p>
+          </div>
+        </li>
+        <li>
+          <span class="ph">PHASE 2</span>
+          <div>
+            <h4>コア抽出とオンボーディング<span class="dur">1〜2週</span></h4>
+            <ul>
+              <li><code>@vocab/core</code> としてロジックを分離、ユニットテスト整備</li>
+              <li>レベルキャリブレーション（50語テスト）</li>
+              <li>固有名詞の自動学習</li>
+            </ul>
+            <p><strong>成果物</strong> — モバイルから import できる形のコア</p>
+          </div>
+        </li>
+        <li>
+          <span class="ph">PHASE 3</span>
+          <div>
+            <h4>モバイル版<span class="dur">3〜4週 / R1・R2 次第</span></h4>
+            <ul>
+              <li>React Native + オーバーレイ/マイク/Vosk のネイティブモジュール</li>
+              <li>オーバーレイ字幕、タップ → カード、SQLite アダプタ</li>
+            </ul>
+            <p><strong>成果物</strong> — スマホ単体で収集と復習ができる</p>
+          </div>
+        </li>
+        <li>
+          <span class="ph">PHASE 4</span>
+          <div>
+            <h4>カードと復習の質<span class="dur">2週</span></h4>
+            <ul>
+              <li>オフライン辞書組み込み、LLM による文脈依存カード生成</li>
+              <li>SRS（SM-2 ベース）、「あのドラマのあの場面」を出典として見せる復習UI</li>
+            </ul>
+            <p><strong>成果物</strong> — 貯めた単語が実際に定着する状態</p>
+          </div>
+        </li>
+        <li>
+          <span class="ph">PHASE 5</span>
+          <div>
+            <h4>同期<span class="dur">1〜2週</span></h4>
+            <p>第14章の方式で PC ⇄ スマホ同期。</p>
+            <p><strong>成果物</strong> — どちらで集めてもどちらでも復習できる</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 14 -->
+    <section id="s14">
+      <h2><span class="n">14</span>将来の同期<br>—— 検討事項 5 への回答</h2>
+      <p><strong>十分に実現可能で、しかも「後から足せるように今すぐ備えておくべき」ものです。</strong>段階的に3案あります。</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>段階</th><th>方式</th><th>インフラ</th><th>手間</th></tr></thead>
+          <tbody>
+            <tr><td>即日</td><td><strong>JSON エクスポート/インポート</strong></td><td>不要</td><td>最小。Phase 1 で入れる</td></tr>
+            <tr><td><span class="chip yes">推奨</span> 現実解</td><td><strong>Google Drive <code>appDataFolder</code></strong></td><td>不要（ユーザーの Drive のアプリ専用隠し領域）</td><td>中</td></tr>
+            <tr><td>本格</td><td>Supabase / Firebase</td><td>サーバ・認証・費用</td><td>大。個人利用には過剰</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>推奨は Google Drive の <code>appDataFolder</code></strong>。サーバー運用ゼロ、費用ゼロ、データはユーザーの手元、の三拍子が揃います。</p>
+      <p>競合解決は<strong>レコード単位の last-write-wins</strong> で十分です（同じ単語を2端末で同時編集する頻度は極めて低いため）。そのために必要なのが第9章の <code>updatedAt</code> / <code>deviceId</code> / <code>deleted</code> です。</p>
+      <pre><code>pull:  自分の lastSyncAt より新しいリモートレコードを取得
+merge: 同一キーなら updatedAt が大きい方を採用
+push:  lastSyncAt 以降に更新したレコードを送信</code></pre>
+      <div class="note">
+        <span class="label">事故を防ぐ特別扱い</span>
+        <p><code>known</code> は「一度知っていると宣言したら基本戻らない」性質なので、マージ時は<strong><code>known</code> を優先</strong>します。片方で known にしたのに古いレコードで unknown に戻る事象を防げます。</p>
+      </div>
+    </section>
+
+    <!-- 15 -->
+    <section id="s15">
+      <h2><span class="n">15</span>法務・プライバシー上の留意点</h2>
+      <ul>
+        <li><strong>字幕の全文保存・再配布はしない。</strong>保持するのは「単語」と「その単語を含む1文」に限定し、エクスポートにも全文を含めない</li>
+        <li><strong>音声は保存しない。</strong>ファイル書き出しの実装自体を持たないことで担保する</li>
+        <li><strong>市販の英検単語リストは取り込まない。</strong>CEFR-J からの換算表示に留める</li>
+        <li><strong>CEFR-J / SUBTLEX は非商用利用条件。</strong>個人学習用途に留め、公開・商用化する場合はライセンスを再確認する</li>
+        <li>Netflix の利用規約は自動化に制限がある。<strong>個人の学習目的に留め、収集データの公開・配布は行わない</strong></li>
+      </ul>
+    </section>
+
+    <section id="next">
+      <h2><span class="n">NEXT</span>次にやること</h2>
+      <ol>
+        <li><strong>Phase 0 の R1・R2 を実施</strong> —— ここが全体の分岐点</li>
+        <li>R2 の結果次第でモバイルの位置づけを確定</li>
+        <li>並行して Phase 1 の Chrome 拡張に着手（R1/R2 の結果に依存しないため）</li>
+      </ol>
+    </section>
+
+  </main>
+
+  <footer>
+    netflix-vocab / docs/DESIGN.md — Allo6600/Reminds-characters @ claude/reminder-ai-google-inn69p
+  </footer>
+
+</div>
